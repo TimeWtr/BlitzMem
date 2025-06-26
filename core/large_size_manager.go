@@ -12,4 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package adaptors
+package core
+
+import (
+	"sync/atomic"
+	"unsafe"
+)
+
+type largePage struct {
+	addr     unsafe.Pointer
+	size     int64
+	isUsed   atomic.Bool
+	shardIdx uint16
+}
+
+type LargeManager struct {
+	largePages     []*largePage
+	largePageCount atomic.Uint32
+	freePages      []*largePage
+	freePageCount  atomic.Uint32
+}

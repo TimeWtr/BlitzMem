@@ -12,4 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package allocator
+package slab
+
+import (
+	"sync/atomic"
+
+	"github.com/TimeWtr/slab/core"
+	"github.com/TimeWtr/slab/eviction"
+	"github.com/TimeWtr/slab/guardian"
+)
+
+type Pool struct {
+	guard     guardian.Guardian
+	m         *core.Manager
+	evict     eviction.Eviction
+	totalSize atomic.Uint64
+	pageSize  atomic.Uint64
+}
