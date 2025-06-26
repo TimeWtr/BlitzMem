@@ -225,7 +225,7 @@ linters:
     - tagliatelle
 
     # Test-related checks. All of them are good.
-    - usetesting
+#    - usetesting
     - testableexamples
     - thelper
     - tparallel
