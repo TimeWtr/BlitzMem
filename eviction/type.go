@@ -12,15 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slab
+package eviction
 
-import (
-	"time"
-)
-
-type Config struct {
-	EnableHugePage  bool
-	NumaNodes       int
-	CompactionRatio float64
-	StatsInterval   time.Duration
-}
+type Eviction interface{}

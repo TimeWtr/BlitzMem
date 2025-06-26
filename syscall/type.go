@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slab
+package syscall
 
-import (
-	"time"
-)
+import "unsafe"
 
-type Config struct {
-	EnableHugePage  bool
-	NumaNodes       int
-	CompactionRatio float64
-	StatsInterval   time.Duration
+type Syscall interface {
+	AllocPages(size int) (unsafe.Pointer, error)
+	FreePages(ptr unsafe.Pointer, size int) error
+	SetProtection(ptr unsafe.Pointer, prot int) error
 }

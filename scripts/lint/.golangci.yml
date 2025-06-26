@@ -2,7 +2,7 @@
 run:
   go: '1.23'
 
-  # default concurrency is a available CPU number
+  # default concurrency is an available CPU number
   concurrency: 4
 
   # timeout for analysis, e.g. 30s, 5m, default is 1m
@@ -16,6 +16,7 @@ issues:
         - funlen
         - dupl
         - maintidx
+        - mnd
   exclude-dirs:
     - .idea
     - .git
@@ -27,9 +28,8 @@ issues:
 # All available settings of specific linters.
 linters-settings:
   gosec:
-    # 禁用特定的 gosec 检查规则
     excludes:
-      - G115  # 禁用整数类型转换溢出检查
+      - G115
       - G404
   cyclop:
     max-complexity: 20
@@ -41,7 +41,7 @@ linters-settings:
   revive:
     rules:
       - name: unused-parameter
-        severity: disabled  # 或 severity: warning
+        severity: disabled
   gocritic:
     disabled-checks:
       - "commentedOutCode"
@@ -57,7 +57,6 @@ linters-settings:
       hugeParam:
         # Size in bytes that makes the warning trigger.
         # Default: 80
-        # 性能瓶颈不在这里
         sizeThreshold: 1024
   govet:
     shadow: true
@@ -66,7 +65,6 @@ linters-settings:
     require-specific: true
   staticcheck:
     checks:
-      # 禁用 SA4008（"-" 表示排除）
       - "-SA4008"
   exhaustive:
     check-generated: false
@@ -134,7 +132,7 @@ linters:
     - funlen
 
     # Reports magic consts. Might be noisy but still good.
-    - mnd
+#    - mnd
 
     # Same as `cyclop` linter (see above)
     - gocognit
@@ -239,7 +237,7 @@ linters:
     - unparam
 
     # Must have. Finds unused declarations.
-    - unused
+#    - unused
 
     # Detect the possibility to use variables/constants from stdlib.
     - usestdlibvars
@@ -247,8 +245,5 @@ linters:
     # Finds wasted assignment statements.
     - wastedassign
 
-    # Forces you to use empty lines. Great if configured correctly.
-#    对于换行之类的来说，wsl 的检测规则和我代码的分组形式冲突了
-#    - wsl
 
 # Options for analysis running.

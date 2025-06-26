@@ -12,15 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slab
+package log
 
 import (
-	"time"
+	"sync"
 )
 
-type Config struct {
-	EnableHugePage  bool
-	NumaNodes       int
-	CompactionRatio float64
-	StatsInterval   time.Duration
+var (
+	mu           sync.RWMutex
+	currentLevel Level = LevelInfo
+)
+
+func SetLevel(level Level) {
+	mu.Lock()
+	defer mu.Unlock()
+	currentLevel = level
+}
+
+func getLevel() Level {
+	mu.RLock()
+	defer mu.RUnlock()
+	return currentLevel
 }

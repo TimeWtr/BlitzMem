@@ -12,4 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package stats
+package slab
+
+const (
+	PageSize = 1024 * 4
+	MaxPages = 1024
+)

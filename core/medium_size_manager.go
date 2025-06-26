@@ -12,4 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package stats
+package core
+
+import (
+	"sync/atomic"
+	"unsafe"
+)
+
+type MediumManager struct {
+	shards  []*MediumSizeShard
+	counter atomic.Int64
+}
+
+func newMediumManager(shards int) *MediumManager {
+	return &MediumManager{
+		shards: make([]*MediumSizeShard, shards),
+	}
+}
+
+type MediumSizeShard struct {
+	freeList  atomic.Pointer[block]
+	freeCount atomic.Uint32
+
+	pages      []unsafe.Pointer
+	pagesCount atomic.Uint32
+}

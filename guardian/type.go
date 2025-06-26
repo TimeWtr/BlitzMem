@@ -12,15 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slab
+package guardian
 
-import (
-	"time"
-)
+import "unsafe"
 
-type Config struct {
-	EnableHugePage  bool
-	NumaNodes       int
-	CompactionRatio float64
-	StatsInterval   time.Duration
+type Guardian interface {
+	Alloc(size int) (unsafe.Pointer, error)
+	Access(ptr unsafe.Pointer, accessFunc func([]byte) error) error
+	Free(ptr unsafe.Pointer, size int) error
+	SetSecurityLevel(level SecurityLevel) error
+	Destroy()
 }
+
+type AlgorithmInfo struct {
+	Name      string
+	KeySize   int
+	BlockSize int
+	IsGuoMi   bool
+	IsHWAccel bool
+}
+
+type SecurityLevel int
+
+const (
+	SecurityNone SecurityLevel = iota
+	SecurityBasic
+	SecurityAdvanced
+	SecurityGuoMiCompliance
+)
