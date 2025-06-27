@@ -30,33 +30,38 @@ import (
 )
 
 const (
-	RunningState = iota
-	StoppedState
+	StoppedState = iota
+	RunningState
 )
 
-type Provider interface {
-	Watch() (chan<- common.Config, error)
-	Close()
-}
+type (
+	Provider interface {
+		Watch() (<-chan common.Config, error)
+		Close()
+	}
 
-type FileProvider struct {
-	parseType        ParseType
-	filepath         string
-	dir              string
-	watcher          *fsnotify.Watcher
-	ch               chan common.Config
-	closeCh          chan struct{}
-	state            *atomicx.Int32
-	logger           log.Logger
-	lock             sync.Mutex
-	debounceLock     sync.Mutex
-	debounceTimer    *time.Timer
-	debounceDuration time.Duration
-	debouncePending  *atomicx.Bool
-	wg               sync.WaitGroup
-}
+	FileProvider struct {
+		parseType        ParseType
+		filepath         string
+		dir              string
+		watcher          *fsnotify.Watcher
+		ch               chan common.Config
+		closeCh          chan struct{}
+		state            *atomicx.Int32
+		logger           log.Logger
+		lock             sync.Mutex
+		debounceLock     sync.Mutex
+		debounceTimer    *time.Timer
+		debounceDuration time.Duration
+		debouncePending  *atomicx.Bool
+		wg               sync.WaitGroup
+	}
+)
 
 func NewFileProvider(parseType ParseType, filepath string, logger log.Logger) (*FileProvider, error) {
+	if !parseType.valid() {
+		return nil, fmt.Errorf("invalid parse type: %s", parseType)
+	}
 	_, err := os.Stat(filepath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -72,15 +77,18 @@ func NewFileProvider(parseType ParseType, filepath string, logger log.Logger) (*
 		filepath:         filepath,
 		dir:              path.Dir(filepath),
 		logger:           logger,
-		state:            atomicx.NewInt32(0),
+		state:            atomicx.NewInt32(StoppedState),
 		debounceDuration: debounceTimeout,
-		debounceTimer:    time.NewTimer(debounceTimeout),
 		debouncePending:  atomicx.NewBool(),
 		closeCh:          make(chan struct{}),
 	}, nil
 }
 
-func (f *FileProvider) Watch() (chan<- common.Config, error) {
+func (f *FileProvider) Watch() (<-chan common.Config, error) {
+	if !f.state.CompareAndSwap(StoppedState, RunningState) {
+		return nil, errors.New("provider is running")
+	}
+
 	initialCfg, err := f.reloadFile(false)
 	if err != nil {
 		return nil, err
@@ -112,14 +120,29 @@ func (f *FileProvider) Watch() (chan<- common.Config, error) {
 }
 
 func (f *FileProvider) watchLoop() {
+	if f.debounceTimer == nil {
+		f.debounceTimer = time.NewTimer(f.debounceDuration)
+	}
+
 	defer func() {
 		f.wg.Done()
-		f.debounceTimer.Stop()
+
 		if f.watcher != nil {
 			if err := f.watcher.Close(); err != nil {
 				f.logger.Error("failed to close the file watcher", log.ErrorField(err))
 			}
 		}
+
+		f.debounceLock.Lock()
+		if f.debounceTimer != nil {
+			if !f.debounceTimer.Stop() {
+				select {
+				case <-f.debounceTimer.C:
+				default:
+				}
+			}
+		}
+		f.debounceLock.Unlock()
 
 		if r := recover(); r != nil {
 			f.logger.Error("file provider error", log.Field{Key: "cause", Val: r})
@@ -144,21 +167,7 @@ func (f *FileProvider) watchLoop() {
 				log.StringField("event", e.Op.String()),
 				log.StringField("path", e.Name))
 
-			switch e.Op {
-			case fsnotify.Write:
-				f.scheduleReload()
-			case fsnotify.Create:
-				f.logger.Info("New profile creation detected")
-				f.scheduleReload()
-			case fsnotify.Remove, fsnotify.Rename:
-				f.handleFileRemoval()
-			case fsnotify.Chmod:
-				f.logger.Debug("File changes detected, skipping processing")
-			default:
-				f.logger.Error("Unhandled file event types",
-					log.StringField("event operation", e.Op.String()))
-			}
-
+			f.handleEvent(e)
 		case <-f.closeCh:
 			f.logger.Debug("Received a shutdown signal and exited file monitoring")
 			return
@@ -172,12 +181,31 @@ func (f *FileProvider) watchLoop() {
 	}
 }
 
+func (f *FileProvider) handleEvent(e fsnotify.Event) {
+	switch e.Op {
+	case fsnotify.Write:
+		f.scheduleReload()
+	case fsnotify.Create:
+		f.logger.Info("New profile creation detected")
+		f.scheduleReload()
+	case fsnotify.Remove, fsnotify.Rename:
+		f.handleFileRemoval()
+	case fsnotify.Chmod:
+		f.logger.Debug("File changes detected, skipping processing")
+	}
+}
+
 func (f *FileProvider) scheduleReload() {
 	f.debounceLock.Lock()
 	defer f.debounceLock.Unlock()
 
 	if f.debounceTimer != nil {
-		f.debounceTimer.Stop()
+		if !f.debounceTimer.Stop() {
+			select {
+			case <-f.debounceTimer.C:
+			default:
+			}
+		}
 	}
 
 	if f.state.Load() == StoppedState {
@@ -198,7 +226,11 @@ func (f *FileProvider) scheduleReload() {
 			return
 		}
 
-		f.ch <- cfg
+		select {
+		case f.ch <- cfg:
+		default:
+			f.logger.Warn("configure channel blocking and skip updates")
+		}
 	})
 
 	f.debouncePending.Store(true)
@@ -214,6 +246,7 @@ func (f *FileProvider) handleFileRemoval() {
 	)
 
 	for i := 0; i < maxAttempts; i++ {
+		time.Sleep(retryDelay)
 		if _, err := os.Stat(f.filepath); err == nil {
 			f.logger.Debug("The configuration file has been restored, rebuild the monitoring")
 			if err1 := f.watcher.Add(f.dir); err1 != nil {
@@ -224,7 +257,7 @@ func (f *FileProvider) handleFileRemoval() {
 			f.scheduleReload()
 			return
 		}
-		time.Sleep(retryDelay)
+
 	}
 	f.logger.Error("The configuration file was not restored within the timeout window.")
 }
@@ -246,8 +279,6 @@ func (f *FileProvider) reloadFile(reload bool) (common.Config, error) {
 		cfg, err = parseJSON(bs)
 	case ParseTypeTOML:
 		cfg, err = parseToml(bs)
-	default:
-		return common.Config{}, errors.New("parse type error")
 	}
 
 	if err != nil {
@@ -268,5 +299,15 @@ func (f *FileProvider) Close() {
 
 	close(f.closeCh)
 	f.wg.Wait()
+	f.debounceLock.Lock()
+	f.debouncePending.Store(false)
+	if f.debounceTimer != nil {
+		if !f.debounceTimer.Stop() {
+			select {
+			case <-f.debounceTimer.C:
+			default:
+			}
+		}
+	}
 	close(f.ch)
 }

@@ -42,12 +42,20 @@ const (
 type ParseType string
 
 const (
-	ParseTypeDefault ParseType = "YAML"
-	ParseTypeYAML    ParseType = "YAML"
-	ParseTypeJSON    ParseType = "JSON"
-	ParseTypeTOML    ParseType = "TOML"
+	ParseTypeYAML ParseType = "YAML"
+	ParseTypeJSON ParseType = "JSON"
+	ParseTypeTOML ParseType = "TOML"
 )
 
 func (p ParseType) String() string {
 	return string(p)
+}
+
+func (p ParseType) valid() bool {
+	switch p {
+	case ParseTypeYAML, ParseTypeJSON, ParseTypeTOML:
+		return true
+	default:
+		return false
+	}
 }

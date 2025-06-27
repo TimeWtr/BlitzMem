@@ -42,7 +42,7 @@ func newSizeClassBuilder(category common.SizeCategory) *SizeClassBuilder {
 
 func (s *SizeClassBuilder) AddWeight(size common.SizeClass, weight float64) *SizeClassBuilder {
 	s.details.Weights = append(s.details.Weights, common.SizeClassWeight{
-		Size:   size,
+		Size:   size.Int(),
 		Weight: weight,
 	})
 

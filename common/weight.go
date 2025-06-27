@@ -15,8 +15,8 @@
 package common
 
 type SizeClassWeight struct {
-	Size   SizeClass `json:"size" yaml:"size" toml:"size"`
-	Weight float64   `json:"weight" yaml:"weight" toml:"weight"`
+	Size   int     `json:"size" yaml:"size" toml:"size"`
+	Weight float64 `json:"weight" yaml:"weight" toml:"weight"`
 }
 
 type SizeClassDetail struct {
