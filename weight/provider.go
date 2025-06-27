@@ -16,6 +16,7 @@ package weight
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,8 +24,14 @@ import (
 	"time"
 
 	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/slab/utils/atomicx"
 	"github.com/TimeWtr/slab/utils/log"
 	"github.com/fsnotify/fsnotify"
+)
+
+const (
+	RunningState = iota
+	StoppedState
 )
 
 type Provider interface {
@@ -39,42 +46,64 @@ type FileProvider struct {
 	watcher          *fsnotify.Watcher
 	ch               chan common.Config
 	closeCh          chan struct{}
+	state            *atomicx.Int32
 	logger           log.Logger
 	lock             sync.Mutex
 	debounceLock     sync.Mutex
 	debounceTimer    *time.Timer
 	debounceDuration time.Duration
-	debouncePending  bool
+	debouncePending  *atomicx.Bool
 	wg               sync.WaitGroup
 }
 
 func NewFileProvider(parseType ParseType, filepath string, logger log.Logger) (*FileProvider, error) {
-	dir := path.Dir(filepath)
 	_, err := os.Stat(filepath)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return nil, err
+		}
+
+		return nil, fmt.Errorf("failed to stat file %s: %w", filepath, err)
 	}
 
 	const debounceTimeout = time.Millisecond * 500
 	return &FileProvider{
 		parseType:        parseType,
 		filepath:         filepath,
-		dir:              dir,
+		dir:              path.Dir(filepath),
 		logger:           logger,
+		state:            atomicx.NewInt32(0),
 		debounceDuration: debounceTimeout,
+		debounceTimer:    time.NewTimer(debounceTimeout),
+		debouncePending:  atomicx.NewBool(),
+		closeCh:          make(chan struct{}),
 	}, nil
 }
 
 func (f *FileProvider) Watch() (chan<- common.Config, error) {
-	f.ch = make(chan common.Config, 100)
-	watcher, err := fsnotify.NewWatcher()
+	initialCfg, err := f.reloadFile(false)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := watcher.Add(f.dir); err != nil {
+	f.ch = make(chan common.Config, 100)
+	f.ch <- initialCfg
+
+	// create file watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
 		return nil, err
 	}
+	f.watcher = watcher
+
+	// add file to watcher
+	if err1 := f.watcher.Add(f.dir); err1 != nil {
+		return nil, err1
+	}
+
+	f.logger.Info("Adding a configuration file to the file watcher",
+		log.StringField("file path", f.filepath),
+		log.StringField("parse type", f.parseType.String()))
 
 	f.wg.Add(1)
 	go f.watchLoop()
@@ -84,18 +113,21 @@ func (f *FileProvider) Watch() (chan<- common.Config, error) {
 
 func (f *FileProvider) watchLoop() {
 	defer func() {
+		f.wg.Done()
+		f.debounceTimer.Stop()
+		if f.watcher != nil {
+			if err := f.watcher.Close(); err != nil {
+				f.logger.Error("failed to close the file watcher", log.ErrorField(err))
+			}
+		}
+
 		if r := recover(); r != nil {
-			f.logger.Error("file provider error", log.Field{
-				Key: "cause",
-				Val: r,
-			})
+			f.logger.Error("file provider error", log.Field{Key: "cause", Val: r})
 		}
 	}()
-	defer f.wg.Done()
-	defer f.debounceTimer.Stop()
-	defer func() {
-		_ = f.watcher.Close()
-	}()
+
+	f.logger.Debug("Start monitoring the configuration file",
+		log.StringField("file path", f.filepath))
 
 	for {
 		select {
@@ -108,9 +140,34 @@ func (f *FileProvider) watchLoop() {
 				continue
 			}
 
+			f.logger.Debug("File change event detected",
+				log.StringField("event", e.Op.String()),
+				log.StringField("path", e.Name))
+
+			switch e.Op {
+			case fsnotify.Write:
+				f.scheduleReload()
+			case fsnotify.Create:
+				f.logger.Info("New profile creation detected")
+				f.scheduleReload()
+			case fsnotify.Remove, fsnotify.Rename:
+				f.handleFileRemoval()
+			case fsnotify.Chmod:
+				f.logger.Debug("File changes detected, skipping processing")
+			default:
+				f.logger.Error("Unhandled file event types",
+					log.StringField("event operation", e.Op.String()))
+			}
+
 		case <-f.closeCh:
+			f.logger.Debug("Received a shutdown signal and exited file monitoring")
 			return
-		case <-f.watcher.Errors:
+		case err, ok := <-f.watcher.Errors:
+			if !ok {
+				return
+			}
+
+			f.logger.Error("File listener error", log.ErrorField(err))
 		}
 	}
 }
@@ -123,11 +180,15 @@ func (f *FileProvider) scheduleReload() {
 		f.debounceTimer.Stop()
 	}
 
+	if f.state.Load() == StoppedState {
+		return
+	}
+
 	f.debounceTimer = time.AfterFunc(f.debounceDuration, func() {
 		f.debounceLock.Lock()
 		defer f.debounceLock.Unlock()
 
-		f.debouncePending = false
+		f.debouncePending.Store(false)
 		cfg, err := f.reloadFile(true)
 		if err != nil {
 			f.logger.Error("Failed to reload config file",
@@ -140,7 +201,32 @@ func (f *FileProvider) scheduleReload() {
 		f.ch <- cfg
 	})
 
-	f.debouncePending = true
+	f.debouncePending.Store(true)
+}
+
+func (f *FileProvider) handleFileRemoval() {
+	f.logger.Warn("The config file was removed or renamed",
+		log.StringField("file", f.filepath))
+
+	const (
+		maxAttempts = 5
+		retryDelay  = 200 * time.Millisecond
+	)
+
+	for i := 0; i < maxAttempts; i++ {
+		if _, err := os.Stat(f.filepath); err == nil {
+			f.logger.Debug("The configuration file has been restored, rebuild the monitoring")
+			if err1 := f.watcher.Add(f.dir); err1 != nil {
+				f.logger.Error("Failed to rebuild the monitoring", log.ErrorField(err1))
+				continue
+			}
+
+			f.scheduleReload()
+			return
+		}
+		time.Sleep(retryDelay)
+	}
+	f.logger.Error("The configuration file was not restored within the timeout window.")
 }
 
 func (f *FileProvider) reloadFile(reload bool) (common.Config, error) {
@@ -176,6 +262,11 @@ func (f *FileProvider) reloadFile(reload bool) (common.Config, error) {
 }
 
 func (f *FileProvider) Close() {
+	if !f.state.CompareAndSwap(RunningState, StoppedState) {
+		return
+	}
+
 	close(f.closeCh)
 	f.wg.Wait()
+	close(f.ch)
 }
