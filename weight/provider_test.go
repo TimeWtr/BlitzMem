@@ -70,7 +70,12 @@ var jsonContent = `
         "weights": [
           {"size": 131072, "weight": 0.60},
           {"size": 262144, "weight": 0.30},
-          {"size": 524288, "weight": 0.10}
+          {"size": 524288, "weight": 0.05},
+          {"size": 1048576, "weight": 0.03},
+          {"size": 2097152, "weight": 0.002},
+          {"size": 4194304, "weight": 0.01},
+          {"size": 8388608, "weight": 0.005},
+          {"size": 16777216, "weight": 0.0025}
         ]
       }
     }

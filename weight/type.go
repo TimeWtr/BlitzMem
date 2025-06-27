@@ -28,8 +28,8 @@ type Event struct {
 	eventType EventType
 	timestamp int64
 	category  common.SizeCategory
-	global    common.GlobalConfig
-	details   common.SizeClassDetail
+	global    map[common.SizeCategory]float64
+	details   []float64
 }
 
 type EventType int
