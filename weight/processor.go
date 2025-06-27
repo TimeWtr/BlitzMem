@@ -14,4 +14,8 @@
 
 package weight
 
-type Processor interface{}
+import "github.com/TimeWtr/slab/common"
+
+type Processor interface {
+	Normalize(cfg common.Config) common.Config
+}
