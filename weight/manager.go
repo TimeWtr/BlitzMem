@@ -15,134 +15,112 @@
 package weight
 
 import (
-	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/TimeWtr/slab/common"
 	"github.com/TimeWtr/slab/utils/log"
 )
 
-type Manager interface{}
+type (
+	Manager interface {
+		Close()
+	}
 
-type ManagerImpl struct {
-	provider       Provider
-	Loader         Loader
-	_              common.GlobalConfig
-	_              common.SizeClassConfig
-	mu             sync.RWMutex
-	eventSig       chan struct{}
-	eventNotifiers map[string]chan Event
-	closeCh        chan struct{}
-	l              log.Logger
-	once           sync.Once
+	ManagerImpl struct {
+		provider  Provider
+		processor Processor
+		global    common.GlobalConfig
+		sizeClass map[common.SizeCategory][]float64
+		mu        sync.RWMutex
+		eventHub  EventHub
+		watcher   <-chan common.Config
+		closeCh   chan struct{}
+		l         log.Logger
+		state     atomic.Int32
+		wg        sync.WaitGroup
+	}
+)
+
+func NewManager(provider Provider, processor Processor, eventHub EventHub, l log.Logger) (Manager, error) {
+	watcher, err := provider.Watch()
+	if err != nil {
+		return nil, err
+	}
+	m := &ManagerImpl{
+		provider:  provider,
+		processor: processor,
+		eventHub:  eventHub,
+		watcher:   watcher,
+		closeCh:   make(chan struct{}),
+		mu:        sync.RWMutex{},
+		l:         l,
+	}
+
+	m.wg.Add(1)
+	go m.asyncLoop()
+
+	return m, nil
 }
 
-func NewManager(provider Provider, loader Loader, l log.Logger) Manager {
-	return &ManagerImpl{
-		provider:       provider,
-		Loader:         loader,
-		eventSig:       make(chan struct{}),
-		eventNotifiers: map[string]chan Event{},
-		closeCh:        make(chan struct{}),
-		mu:             sync.RWMutex{},
-		l:              l,
-	}
-}
+func (m *ManagerImpl) asyncLoop() {
+	defer func() {
+		m.provider.Close()
+		m.wg.Done()
+	}()
 
-func (m *ManagerImpl) RegisterEventNotify(tag string, ch chan Event) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.eventNotifiers[tag] = ch
-}
-
-func (m *ManagerImpl) UnregisterEventNotify(tag string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.eventNotifiers, tag)
-}
-
-//nolint:unused // will be used in new version
-func (m *ManagerImpl) globalEventNotify(gc common.GlobalConfig) {
-	m.mu.RLock()
-	notifiers := m.eventNotifiers
-	m.mu.RUnlock()
-	if len(notifiers) == 0 {
-		return
-	}
-
-	event := Event{
-		eventType: GlobalConfigChange,
-		global:    gc,
-	}
-	for _, ch := range notifiers {
-		select {
-		case ch <- event:
-		case <-time.After(time.Millisecond * 100):
-			m.l.Error("failed to notify global config",
-				log.ErrorField(context.DeadlineExceeded))
-		case <-m.closeCh:
-			m.l.Info("global notifier loop receive stop signal")
-			return
-		}
-	}
-}
-
-func (m *ManagerImpl) sizeClassEventNotify(details common.SizeClassDetail) {
-	m.mu.RLock()
-	notifiers := m.eventNotifiers
-	m.mu.RUnlock()
-	if len(notifiers) == 0 {
-		return
-	}
-
-	event := Event{
-		details:   details,
-		eventType: SizeClassConfigChange,
-	}
-
-	for _, ch := range notifiers {
-		select {
-		case ch <- event:
-		case <-time.After(time.Millisecond * 100):
-			m.l.Error("failed to notify size class config",
-				log.StringField("description", event.details.Description),
-				log.ErrorField(context.DeadlineExceeded))
-		case <-m.closeCh:
-			m.l.Info("size class notifier loop receive stop signal")
-		}
-	}
-}
-
-func (m *ManagerImpl) monitor() {
 	for {
 		select {
-		case <-m.eventSig:
-			m.l.Debug("receive weight config event!")
-			gc, err := m.Loader.LoadGlobalConfig()
+		case rawData, ok := <-m.watcher:
+			if !ok {
+				return
+			}
+			m.l.Info("weight provider watcher channel closed")
+			normalizeConf, err := m.processor.Normalize(rawData)
 			if err != nil {
-				m.l.Error("failed to load global config", log.ErrorField(err))
+				m.l.Error("the original data normalization failed", log.ErrorField(err))
 				continue
 			}
-			m.globalEventNotify(gc)
 
-			sc, err := m.Loader.LoadSizeClassConfig()
-			if err != nil {
-				m.l.Error("failed to load size class config", log.ErrorField(err))
-				continue
-			}
-			m.sizeClassEventNotify(sc)
+			global := m.processor.BuildGlobalStruct(normalizeConf)
+			sizeClasses := m.processor.BuildSizeClassStruct(normalizeConf)
+			m.dispatchGlobalEvent(global)
+			m.dispatchSizeClassEvent(sizeClasses)
 		case <-m.closeCh:
+			m.l.Info("receive stop manager signal")
 			return
 		}
+	}
+}
+
+func (m *ManagerImpl) dispatchGlobalEvent(global map[common.SizeCategory]float64) {
+	m.eventHub.Dispatch(Event{
+		eventType: GlobalConfigChange,
+		global:    global,
+		timestamp: time.Now().UnixNano(),
+	})
+}
+
+func (m *ManagerImpl) dispatchSizeClassEvent(sizeClasses map[common.SizeCategory][]float64) {
+	for category, weights := range sizeClasses {
+		m.eventHub.Dispatch(Event{
+			eventType: SizeClassConfigChange,
+			category:  category,
+			details:   weights,
+			timestamp: time.Now().UnixNano(),
+		})
 	}
 }
 
 func (m *ManagerImpl) Close() {
-	m.once.Do(func() {
-		close(m.closeCh)
-		for _, ch := range m.eventNotifiers {
-			close(ch)
-		}
-	})
+	if !m.state.CompareAndSwap(RunningState, StoppedState) {
+		return
+	}
+
+	close(m.closeCh)
+	m.wg.Wait()
+	m.processor.Close()
+	m.processor.Close()
+	m.eventHub.Close()
 }
