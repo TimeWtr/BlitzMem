@@ -1,4 +1,3 @@
-# BlitzMem
 <div align="center">
 <img src="./assets/images/img.png" alt="TurboAlloc Logo" style="width: 45%; max-width: 450px;">
 
