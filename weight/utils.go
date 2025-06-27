@@ -64,7 +64,6 @@ func DefaultSizeClassWeightConfig() common.SizeClassConfig {
 	}
 }
 
-//nolint:unused // will be used in new version
 func parseYaml(data any) (common.Config, error) {
 	bs, err := yaml.Marshal(data)
 	if err != nil {
@@ -87,7 +86,6 @@ func parseJSON(data any) (common.Config, error) {
 	return cfg, err
 }
 
-//nolint:unused // will be used in new version
 func parseToml(data any) (common.Config, error) {
 	bs, err := toml.Marshal(data)
 	if err != nil {
