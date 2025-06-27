@@ -1,0 +1,51 @@
+version: v2.0
+global:
+    small: 0.6
+    medium: 0.3
+    large: 0.1
+sizeClass:
+    small:
+        description: Small Size Weight (8B-8KB)
+        weights:
+            - size: 8
+              weight: 0.35
+            - size: 16
+              weight: 0.15
+            - size: 32
+              weight: 0.12
+            - size: 64
+              weight: 0.1
+            - size: 128
+              weight: 0.08
+            - size: 256
+              weight: 0.06
+            - size: 512
+              weight: 0.05
+            - size: 1024
+              weight: 0.04
+            - size: 2048
+              weight: 0.03
+            - size: 4096
+              weight: 0.02
+    medium:
+        description: Medium Size Weight (8KB-64KB)
+        weights:
+            - size: 8192
+              weight: 0.4
+            - size: 16384
+              weight: 0.25
+            - size: 32768
+              weight: 0.2
+            - size: 49152
+              weight: 0.1
+            - size: 65536
+              weight: 0.05
+    large:
+        description: Large Size Weight (64KB+)
+        weights:
+            - size: 131072
+              weight: 0.6
+            - size: 262144
+              weight: 0.3
+            - size: 524288
+              weight: 0.1

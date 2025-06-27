@@ -37,7 +37,7 @@ func NewSizeClassAccessor(details common.SizeClassDetail) *SizeClassAccessor {
 func (s *SizeClassAccessor) GetWeightMap() map[common.SizeClass]float64 {
 	if !s.cached {
 		for _, weight := range s.details.Weights {
-			s.weightMap[weight.Size] = weight.Weight
+			s.weightMap[common.SizeClass(weight.Size)] = weight.Weight
 		}
 
 		s.cached = true
@@ -65,7 +65,7 @@ func (s *SizeClassAccessor) GetSortedWeight() []common.SizeClassWeight {
 func (s *SizeClassAccessor) AddWeight(size common.SizeClass, weight float64) {
 	if _, exist := s.weightMap[size]; exist {
 		for i := 0; i < len(s.details.Weights); i++ {
-			if s.details.Weights[i].Size == size {
+			if s.details.Weights[i].Size == size.Int() {
 				s.details.Weights[i].Weight = weight
 				s.weightMap[size] = weight
 				return
@@ -74,7 +74,7 @@ func (s *SizeClassAccessor) AddWeight(size common.SizeClass, weight float64) {
 	}
 
 	s.details.Weights = append(s.details.Weights, common.SizeClassWeight{
-		Size:   size,
+		Size:   int(size),
 		Weight: weight,
 	})
 }

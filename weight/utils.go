@@ -64,35 +64,20 @@ func DefaultSizeClassWeightConfig() common.SizeClassConfig {
 	}
 }
 
-func parseYaml(data any) (common.Config, error) {
-	bs, err := yaml.Marshal(data)
-	if err != nil {
-		return common.Config{}, err
-	}
-
+func parseYaml(data []byte) (common.Config, error) {
 	var cfg common.Config
-	err = yaml.Unmarshal(bs, &cfg)
+	err := yaml.Unmarshal(data, &cfg)
 	return cfg, err
 }
 
-func parseJSON(data any) (common.Config, error) {
-	bs, err := json.Marshal(data)
-	if err != nil {
-		return common.Config{}, err
-	}
-
+func parseJSON(data []byte) (common.Config, error) {
 	var cfg common.Config
-	err = json.Unmarshal(bs, &cfg)
+	err := json.Unmarshal(data, &cfg)
 	return cfg, err
 }
 
-func parseToml(data any) (common.Config, error) {
-	bs, err := toml.Marshal(data)
-	if err != nil {
-		return common.Config{}, err
-	}
-
+func parseToml(data []byte) (common.Config, error) {
 	var cfg common.Config
-	err = toml.Unmarshal(bs, &cfg)
+	err := toml.Unmarshal(data, &cfg)
 	return cfg, err
 }

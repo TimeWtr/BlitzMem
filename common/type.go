@@ -14,7 +14,7 @@
 
 package common
 
-type SizeClass uint8
+type SizeClass int
 
 const (
 	SizeClass8B SizeClass = iota

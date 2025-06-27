@@ -1,12 +1,11 @@
 {
   "version": "1.0",
-  "weight": {
-    "global_weights": {
+    "global": {
       "small": 0.6,
       "medium": 0.3,
       "large": 0.1
     },
-    "size_class_weights": {
+    "sizeClass": {
       "small": {
         "description": "Small Size Weight (8B-8KB)",
         "weights": [
@@ -41,5 +40,4 @@
         ]
       }
     }
-  }
 }
