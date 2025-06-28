@@ -20,6 +20,31 @@ import (
 	"github.com/TimeWtr/TurboAlloc/common"
 )
 
+// TypeMeta holds metadata information for a plugin, including its type, name, version,
+// priority, enabled status, and description. This struct is used to register and manage
+// plugins within the system.
+type TypeMeta struct {
+	// Type specifies the category of the plugin (e.g., config, runtime, lifecycle).
+	Type TypePlugin
+
+	// Name is the unique identifier of the plugin.
+	Name string
+
+	// Version indicates the current version of the plugin.
+	Version string
+
+	// Priority specifies the importance level of the plugin in the system, influencing
+	// the order of initialization and execution. Lower priority plugins are processed
+	// earlier during startup and later during shutdown.
+	Priority PriorityLevel
+
+	// Enable indicates whether this plugin is active and should be initialized.
+	Enable bool
+
+	// Description provides a brief explanation of the plugin's purpose.
+	Description string
+}
+
 type TypePlugin uint8
 
 // TypePlugin represents the type category of an extension, used to classify different functionalities
@@ -77,3 +102,14 @@ type MonitorPlugin interface {
 	Plugin
 	Monitor(ctx context.Context) error
 }
+
+type PriorityLevel int
+
+const (
+	PriorityLevelSystemCritical PriorityLevel = 50
+	PriorityLevelHigh           PriorityLevel = 100
+	PriorityLevelStandard       PriorityLevel = 300
+	PriorityLevelAdjustment     PriorityLevel = 600
+	PriorityLevelMonitoring     PriorityLevel = 800
+	PriorityLevelReporting      PriorityLevel = 900
+)
