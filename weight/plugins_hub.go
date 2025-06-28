@@ -172,6 +172,8 @@ type (
 			hookFunc func(p plugin.Plugin) (any, error)) ([]HookResult, error)
 	}
 
+	Advanced interface{}
+
 	PluginStatus struct {
 		Name string
 	}
@@ -180,6 +182,7 @@ type (
 
 	PluginsHubImpl struct {
 		plugins map[plugin.TypePlugin][]plugin.Plugin
+		types   []plugin.TypePlugin
 		mu      sync.RWMutex
 		state   atomicx.Bool
 	}
