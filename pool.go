@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slab
+package turboalloc
 
 import (
 	"sync/atomic"
 
-	"github.com/TimeWtr/slab/core"
-	"github.com/TimeWtr/slab/eviction"
-	"github.com/TimeWtr/slab/guardian"
+	"github.com/TimeWtr/TurboAlloc/core"
+	"github.com/TimeWtr/TurboAlloc/eviction"
+	"github.com/TimeWtr/TurboAlloc/guardian"
 )
 
 type Pool struct {

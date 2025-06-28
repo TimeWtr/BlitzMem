@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 
 	"github.com/BurntSushi/toml"
-	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/TurboAlloc/common"
 	"gopkg.in/yaml.v3"
 )
 

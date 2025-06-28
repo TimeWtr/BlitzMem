@@ -19,9 +19,10 @@ import (
 	"math"
 	"sort"
 
-	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/TurboAlloc/common"
 )
 
+//go:generate mockgen -source=processor.go -destination=processor_mock.go -package=weight Processor
 type (
 	Processor interface {
 		Normalize(cfg common.Config) (common.Config, error)

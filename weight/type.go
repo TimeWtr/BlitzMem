@@ -15,7 +15,7 @@
 package weight
 
 import (
-	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/TurboAlloc/common"
 )
 
 type Loader interface {
