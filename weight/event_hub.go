@@ -23,7 +23,7 @@ import (
 	"github.com/TimeWtr/TurboAlloc/utils/log"
 )
 
-//go:generate mockgen -source=eventhub.go -destination=eventhub_mock.go -package=weight EventHub
+//go:generate mockgen -source=event_hub.go -destination=event_hub_mock.go -package=weight EventHub
 type (
 	EventHub interface {
 		Register(tag string, sc common.SizeCategory, bufferSize ...int) <-chan Event
