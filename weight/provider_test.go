@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/TimeWtr/slab/common"
-	"github.com/TimeWtr/slab/utils/log"
+	"github.com/TimeWtr/TurboAlloc/common"
+	"github.com/TimeWtr/TurboAlloc/utils/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"

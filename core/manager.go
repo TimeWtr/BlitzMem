@@ -18,8 +18,8 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/TimeWtr/slab/common"
-	"github.com/TimeWtr/slab/utils"
+	"github.com/TimeWtr/TurboAlloc/common"
+	"github.com/TimeWtr/TurboAlloc/utils"
 )
 
 type Manager struct {

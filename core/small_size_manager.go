@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/TurboAlloc/common"
 )
 
 const SmallShardNums = 16

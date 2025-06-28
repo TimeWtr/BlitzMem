@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TimeWtr/slab/common"
-	"github.com/TimeWtr/slab/utils/atomicx"
-	"github.com/TimeWtr/slab/utils/log"
+	"github.com/TimeWtr/TurboAlloc/common"
+	"github.com/TimeWtr/TurboAlloc/utils/atomicx"
+	"github.com/TimeWtr/TurboAlloc/utils/log"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -34,6 +34,7 @@ const (
 	RunningState
 )
 
+//go:generate mockgen -source=provider.go -destination=provider_mock.go -package=weight Provider
 type (
 	Provider interface {
 		Watch() (<-chan common.Config, error)

@@ -19,30 +19,38 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TimeWtr/slab/common"
-	"github.com/TimeWtr/slab/utils/log"
+	"github.com/TimeWtr/TurboAlloc/common"
+	"github.com/TimeWtr/TurboAlloc/utils/log"
 )
 
-type EventHub interface {
-	Register(tag string, sc common.SizeCategory, bufferSize ...int) <-chan Event
-	Unregister(tag string)
-	Dispatch(ev Event)
-	Close()
-}
+//go:generate mockgen -source=eventhub.go -destination=eventhub_mock.go -package=weight EventHub
+type (
+	EventHub interface {
+		Register(tag string, sc common.SizeCategory, bufferSize ...int) <-chan Event
+		Unregister(tag string)
+		Dispatch(ev Event)
+		Close()
+	}
 
-type Listener struct {
-	tag      string
-	category common.SizeCategory
-	ch       chan Event
-}
+	Listener struct {
+		tag      string
+		category common.SizeCategory
+		ch       chan Event
+	}
+)
 
 // EventHubImpl manages event listeners and broadcasts events to them
 type EventHubImpl struct {
-	listeners []Listener    // Slice of listeners identified by tags
-	closeCh   chan struct{} // Channel for closing signal
-	once      sync.Once     // Ensures close operation executes only once
-	l         log.Logger    // Logger instance
-	mu        sync.RWMutex  // RWMutex for concurrent access protection
+	// Slice of listeners identified by tags
+	listeners []Listener
+	// Channel for closing signal
+	closeCh chan struct{}
+	// Ensures close operation executes only once
+	once sync.Once
+	// Logger instance
+	l log.Logger
+	// RWMutex for concurrent access protection
+	mu sync.RWMutex
 }
 
 // newEventHubImpl creates a new EventHubImpl instance

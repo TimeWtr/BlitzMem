@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/TurboAlloc/common"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TimeWtr/slab/common"
-	"github.com/TimeWtr/slab/utils/log"
+	"github.com/TimeWtr/TurboAlloc/common"
+	"github.com/TimeWtr/TurboAlloc/utils/log"
 	"go.uber.org/zap"
 )
 

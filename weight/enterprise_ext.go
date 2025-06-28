@@ -17,7 +17,7 @@ package weight
 import (
 	"context"
 
-	"github.com/TimeWtr/slab/common"
+	"github.com/TimeWtr/TurboAlloc/common"
 )
 
 type Extension interface {
