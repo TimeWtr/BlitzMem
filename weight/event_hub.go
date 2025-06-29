@@ -43,6 +43,8 @@ type (
 type EventHubImpl struct {
 	// Slice of listeners identified by tags
 	listeners []Listener
+	// Dead Letter Queue (DLQ) instance for handling failed event dispatches
+	dql DLQ
 	// Channel for closing signal
 	closeCh chan struct{}
 	// Ensures close operation executes only once
