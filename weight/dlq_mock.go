@@ -53,10 +53,10 @@ func (mr *MockDLQMockRecorder) Close() *gomock.Call {
 }
 
 // GetAll mocks base method.
-func (m *MockDLQ) GetAll(ctx context.Context) ([]DLQEvent, error) {
+func (m *MockDLQ) GetAll(ctx context.Context) ([]*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll", ctx)
-	ret0, _ := ret[0].([]DLQEvent)
+	ret0, _ := ret[0].([]*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -83,10 +83,10 @@ func (mr *MockDLQMockRecorder) GetSize() *gomock.Call {
 }
 
 // Pop mocks base method.
-func (m *MockDLQ) Pop(ctx context.Context) (DLQEvent, error) {
+func (m *MockDLQ) Pop(ctx context.Context) (*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Pop", ctx)
-	ret0, _ := ret[0].(DLQEvent)
+	ret0, _ := ret[0].(*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -98,7 +98,7 @@ func (mr *MockDLQMockRecorder) Pop(ctx any) *gomock.Call {
 }
 
 // Push mocks base method.
-func (m *MockDLQ) Push(ctx context.Context, event DLQEvent) error {
+func (m *MockDLQ) Push(ctx context.Context, event *DLQEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Push", ctx, event)
 	ret0, _ := ret[0].(error)
@@ -162,10 +162,10 @@ func (mr *MockPersistentDLQMockRecorder) Close() *gomock.Call {
 }
 
 // GetAll mocks base method.
-func (m *MockPersistentDLQ) GetAll(ctx context.Context) ([]DLQEvent, error) {
+func (m *MockPersistentDLQ) GetAll(ctx context.Context) ([]*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll", ctx)
-	ret0, _ := ret[0].([]DLQEvent)
+	ret0, _ := ret[0].([]*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -192,10 +192,10 @@ func (mr *MockPersistentDLQMockRecorder) GetSize() *gomock.Call {
 }
 
 // Pop mocks base method.
-func (m *MockPersistentDLQ) Pop(ctx context.Context) (DLQEvent, error) {
+func (m *MockPersistentDLQ) Pop(ctx context.Context) (*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Pop", ctx)
-	ret0, _ := ret[0].(DLQEvent)
+	ret0, _ := ret[0].(*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -207,7 +207,7 @@ func (mr *MockPersistentDLQMockRecorder) Pop(ctx any) *gomock.Call {
 }
 
 // Push mocks base method.
-func (m *MockPersistentDLQ) Push(ctx context.Context, event DLQEvent) error {
+func (m *MockPersistentDLQ) Push(ctx context.Context, event *DLQEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Push", ctx, event)
 	ret0, _ := ret[0].(error)
@@ -221,10 +221,10 @@ func (mr *MockPersistentDLQMockRecorder) Push(ctx, event any) *gomock.Call {
 }
 
 // Recover mocks base method.
-func (m *MockPersistentDLQ) Recover() ([]DLQEvent, error) {
+func (m *MockPersistentDLQ) Recover() ([]*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Recover")
-	ret0, _ := ret[0].([]DLQEvent)
+	ret0, _ := ret[0].([]*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -300,10 +300,10 @@ func (mr *MockDistributedDLQMockRecorder) ClusterSize() *gomock.Call {
 }
 
 // GetAll mocks base method.
-func (m *MockDistributedDLQ) GetAll(ctx context.Context) ([]DLQEvent, error) {
+func (m *MockDistributedDLQ) GetAll(ctx context.Context) ([]*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll", ctx)
-	ret0, _ := ret[0].([]DLQEvent)
+	ret0, _ := ret[0].([]*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -330,10 +330,10 @@ func (mr *MockDistributedDLQMockRecorder) GetSize() *gomock.Call {
 }
 
 // Pop mocks base method.
-func (m *MockDistributedDLQ) Pop(ctx context.Context) (DLQEvent, error) {
+func (m *MockDistributedDLQ) Pop(ctx context.Context) (*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Pop", ctx)
-	ret0, _ := ret[0].(DLQEvent)
+	ret0, _ := ret[0].(*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -345,7 +345,7 @@ func (mr *MockDistributedDLQMockRecorder) Pop(ctx any) *gomock.Call {
 }
 
 // Push mocks base method.
-func (m *MockDistributedDLQ) Push(ctx context.Context, event DLQEvent) error {
+func (m *MockDistributedDLQ) Push(ctx context.Context, event *DLQEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Push", ctx, event)
 	ret0, _ := ret[0].(error)
@@ -359,10 +359,10 @@ func (mr *MockDistributedDLQMockRecorder) Push(ctx, event any) *gomock.Call {
 }
 
 // Recover mocks base method.
-func (m *MockDistributedDLQ) Recover() ([]DLQEvent, error) {
+func (m *MockDistributedDLQ) Recover() ([]*DLQEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Recover")
-	ret0, _ := ret[0].([]DLQEvent)
+	ret0, _ := ret[0].([]*DLQEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
