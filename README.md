@@ -1,5 +1,5 @@
 <div align="center">
-<img src="./assets/images/img_1.png" alt="TurboAlloc Logo" style="width: 45%; max-width: 450px;">
+<img src="./assets/logo/img_1.png" alt="TurboAlloc Logo" style="width: 45%; max-width: 450px;">
 
 <br/>
 </div>
