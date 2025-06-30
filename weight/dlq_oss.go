@@ -163,9 +163,19 @@ func (d *DLQImpl) Pop(ctx context.Context) (event *DLQEvent, err error) {
 				}
 			}
 
-			d.headIdx.Store(0)
 			d.resizePending.SetFalse()
 		}
+
+		chunk := d.q[d.headChunk.Load()]
+		eventPtr := chunk.q[d.headIdx.Load()]
+		if eventPtr == nil {
+			continue
+		}
+
+		event = (*DLQEvent)(eventPtr)
+		d.headIdx.Add(1)
+		d.totalCount.Add(-1)
+		return event, nil
 	}
 }
 
