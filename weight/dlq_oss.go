@@ -19,89 +19,199 @@ import (
 	"errors"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/TimeWtr/TurboAlloc/utils/atomicx"
 )
 
-type DeadQueueImpl struct {
-	q        []*DLQEvent
-	head     int
-	tail     int
-	count    int
-	capacity int
-	mu       sync.RWMutex
-	state    *atomicx.Bool
-	ticker   *time.Ticker
-	closeCh  chan struct{}
-}
+const (
+	chunkSize = 256
+	minChunks = 2
+	maxChunks = 50
+)
 
-func newDeadQueueImpl() DLQ {
-	return &DeadQueueImpl{
-		q: make([]*DLQEvent, deadQueueSize),
-		// current read index
-		head: 0,
-		// current write index
-		tail:     0,
-		count:    0,
-		capacity: deadQueueSize,
-		state:    atomicx.NewBool(),
-		ticker:   time.NewTicker(time.Second * 10),
-		closeCh:  make(chan struct{}),
+type (
+	DLQImpl struct {
+		q             []*QueueChunk
+		headChunk     *atomicx.Int32
+		tailChunk     *atomicx.Int32
+		headIdx       *atomicx.Int32
+		tailIdx       *atomicx.Int32
+		totalCount    *atomicx.Int32
+		resizePending *atomicx.Bool
+		state         *atomicx.Bool
+		ticker        *time.Ticker
+		mu            sync.RWMutex
+		closeCh       chan struct{}
+	}
+
+	QueueChunk struct {
+		q    []unsafe.Pointer
+		size int
+	}
+)
+
+func newQueueChunk(size int) *QueueChunk {
+	return &QueueChunk{
+		q:    make([]unsafe.Pointer, size),
+		size: size,
 	}
 }
 
-func (d *DeadQueueImpl) Push(ctx context.Context, event DLQEvent) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if !d.state.Load() {
-		return errors.New("queue closed")
+func newDLQImpl() DLQ {
+	d := &DLQImpl{
+		q:             make([]*QueueChunk, 0, minChunks),
+		headChunk:     atomicx.NewInt32(0),
+		tailChunk:     atomicx.NewInt32(0),
+		headIdx:       atomicx.NewInt32(0),
+		tailIdx:       atomicx.NewInt32(0),
+		totalCount:    atomicx.NewInt32(0),
+		resizePending: atomicx.NewBool(),
+		state:         atomicx.NewBool(),
+		ticker:        time.NewTicker(time.Millisecond * 10),
+		closeCh:       make(chan struct{}),
 	}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+	for i := 0; i < minChunks; i++ {
+		d.q = append(d.q, newQueueChunk(chunkSize))
 	}
 
-	if d.count == d.capacity {
-		if d.count >= maxQueueSize {
-			return errors.New("queue is full")
+	return d
+}
+
+func (d *DLQImpl) Push(ctx context.Context, event *DLQEvent) error {
+	for {
+		if !d.state.Load() {
+			return errors.New("queue closed")
 		}
 
-		// execute resize operation
-		newCapacity := min(d.capacity*2, maxQueueSize)
-		d.resize(newCapacity)
-	}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
-	d.q[d.tail] = &event
-	d.tail++
-	return nil
+		if d.resizePending.Load() {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+
+		if d.tailIdx.Load() == int32(d.q[d.tailChunk.Load()].size) {
+			if !d.resizePending.CompareAndSwap(false, true) {
+				continue
+			}
+
+			newChunkIdx := d.tailChunk.Add(1) % int32(len(d.q))
+			if newChunkIdx == d.headChunk.Load() {
+				// exec expansion operation
+				newChunk := newQueueChunk(chunkSize)
+				d.q = append(d.q, newChunk)
+			} else {
+				d.tailChunk.Store(newChunkIdx)
+			}
+
+			d.tailIdx.Store(0)
+			d.resizePending.SetFalse()
+		}
+
+		tail := d.tailIdx.Load()
+		if !d.tailIdx.CompareAndSwap(tail, tail+1) {
+			continue
+		}
+
+		chunk := d.q[d.tailChunk.Load()]
+		chunk.q[tail] = unsafe.Pointer(event)
+		d.totalCount.Add(1)
+		return nil
+	}
 }
 
-func (d *DeadQueueImpl) Pop(ctx context.Context) (event DLQEvent, err error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if !d.state.Load() {
-		return DLQEvent{}, errors.New("queue closed")
-	}
+func (d *DLQImpl) Pop(ctx context.Context) (event *DLQEvent, err error) {
+	for {
+		if !d.state.Load() {
+			return &DLQEvent{}, errors.New("queue closed")
+		}
 
-	select {
-	case <-ctx.Done():
-		return DLQEvent{}, ctx.Err()
+		select {
+		case <-ctx.Done():
+			return &DLQEvent{}, ctx.Err()
+		default:
+		}
+
+		if len(d.q) == 0 {
+			return &DLQEvent{}, nil
+		}
+
+		if d.resizePending.Load() {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+
+		if d.headIdx.Load() == int32(d.q[d.headChunk.Load()].size) {
+			if !d.resizePending.CompareAndSwap(false, true) {
+				continue
+			}
+
+			// newChunkIdx := d.headChunk.Add(1) % int32(len(d.q))
+			if len(d.q) > minChunks {
+				// calculate free chunk counts
+				headChunk := d.headChunk.Load()
+				tailChunk := d.tailChunk.Load()
+				freeChunks := d.calculateFreeChunks(headChunk, tailChunk)
+				if freeChunks > len(d.q)/2 {
+					d.shrink(headChunk, tailChunk, freeChunks)
+				}
+			}
+
+			d.headIdx.Store(0)
+			d.resizePending.SetFalse()
+		}
+	}
+}
+
+func (d *DLQImpl) calculateFreeChunks(headChunk, tailChunk int32) (freeChunks int) {
+	switch {
+	case headChunk == tailChunk:
+		freeChunks = len(d.q) - 1
+	case headChunk < tailChunk:
+		freeChunks = int(int32(len(d.q)-1) - tailChunk + headChunk)
 	default:
-
+		freeChunks = int(headChunk - tailChunk - 1)
 	}
 
-	return DLQEvent{}, nil
+	return freeChunks
 }
 
-func (d *DeadQueueImpl) GetSize() (int, error) {
+func (d *DLQImpl) shrink(headChunk, tailChunk int32, freeChunks int) {
+	// exec shrink operation
+	copyCount := len(d.q) - freeChunks
+	newSize := max(minChunks, copyCount)
+	newQ := make([]*QueueChunk, newSize)
+
+	if headChunk < tailChunk {
+		copy(newQ, d.q[headChunk:headChunk+int32(copyCount)])
+	} else {
+		firstPart := int32(len(d.q)) - headChunk
+		copy(newQ, d.q[headChunk:headChunk+firstPart])
+
+		if firstPart < int32(copyCount) {
+			copy(newQ[firstPart:], d.q[:int32(copyCount)-firstPart])
+		}
+	}
+
+	d.q = newQ
+	d.headChunk.Store(0)
+	d.tailChunk.Store(int32(copyCount - 1))
+}
+
+func (d *DLQImpl) GetSize() (int, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return len(d.q), nil
+
+	return int(d.totalCount.Load()), nil
 }
 
-func (d *DeadQueueImpl) GetAll(ctx context.Context) ([]DLQEvent, error) {
+func (d *DLQImpl) GetAll(ctx context.Context) ([]*DLQEvent, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if !d.state.Load() {
@@ -117,7 +227,7 @@ func (d *DeadQueueImpl) GetAll(ctx context.Context) ([]DLQEvent, error) {
 	return nil, nil
 }
 
-func (d *DeadQueueImpl) Remove(ctx context.Context, _ int64) error {
+func (d *DLQImpl) Remove(ctx context.Context, _ int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -134,15 +244,10 @@ func (d *DeadQueueImpl) Remove(ctx context.Context, _ int64) error {
 	return nil
 }
 
-func (d *DeadQueueImpl) resize(capacity int) {
-	newBuffer := make([]*DLQEvent, capacity)
-	if d.head < d.tail {
-		copy(newBuffer, d.q[d.head:d.tail])
-	} else {
-	}
+func (d *DLQImpl) removeAt() {
 }
 
-func (d *DeadQueueImpl) Close() {
+func (d *DLQImpl) Close() {
 	if !d.state.CompareAndSwap(true, false) {
 		return
 	}

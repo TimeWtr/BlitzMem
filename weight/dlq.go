@@ -18,11 +18,6 @@ import (
 	"context"
 )
 
-const (
-	deadQueueSize = 512
-	maxQueueSize  = 10000
-)
-
 //go:generate mockgen -source=dlq.go -destination=dlq_mock.go -package=weight
 type (
 	// DLQ (Dead Letter Queue) interface provides functionality to handle failed events.
@@ -34,12 +29,12 @@ type (
 		// ctx: Context for handling cancellation or timeouts.
 		// event: The DLQEvent to be stored in the queue.
 		// Returns an error if the operation fails.
-		Push(ctx context.Context, event DLQEvent) error
+		Push(ctx context.Context, event *DLQEvent) error
 
 		// Pop retrieves and removes the oldest event from the queue.
 		// ctx: Context for handling cancellation or timeouts.
 		// Returns the retrieved DLQEvent and an error if the operation fails.
-		Pop(ctx context.Context) (event DLQEvent, err error)
+		Pop(ctx context.Context) (event *DLQEvent, err error)
 
 		// GetSize returns the current number of events in the queue.
 		// Returns the size as an int and an error if the operation fails.
@@ -48,7 +43,7 @@ type (
 		// GetAll retrieves all events currently in the queue without removing them.
 		// ctx: Context for handling cancellation or timeouts.
 		// Returns a slice of DLQEvents and an error if the operation fails.
-		GetAll(ctx context.Context) ([]DLQEvent, error)
+		GetAll(ctx context.Context) ([]*DLQEvent, error)
 
 		// Remove deletes a specific event from the queue by its ID.
 		// ctx: Context for handling cancellation or timeouts.
@@ -68,7 +63,7 @@ type (
 
 		// Recover retrieves all persisted events from the storage that were not successfully processed.
 		// Returns a slice of DLQEvents that need to be retried and an error if the recovery operation fails.
-		Recover() ([]DLQEvent, error)
+		Recover() ([]*DLQEvent, error)
 	}
 
 	// DistributedDLQ extends the PersistentDLQ interface to provide functionality for distributed environments.
