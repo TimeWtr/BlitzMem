@@ -37,8 +37,8 @@ type (
 		Pop(ctx context.Context) (event *DLQEvent, err error)
 
 		// GetSize returns the current number of events in the queue.
-		// Returns the size as an int and an error if the operation fails.
-		GetSize() (int, error)
+		// Returns the size as an int.
+		GetSize() int
 
 		// GetAll retrieves all events currently in the queue without removing them.
 		// ctx: Context for handling cancellation or timeouts.
