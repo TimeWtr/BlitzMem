@@ -127,6 +127,10 @@ func (r *RingBuffer) close() {
 }
 
 func newDLQOss(capacity int32) *DLQOss {
+	if capacity < minCapacity {
+		capacity = minCapacity
+	}
+
 	ringBuf := newRingBuffer(capacity)
 	dlq := &DLQOss{
 		buf:        atomicx.NewPointer(unsafe.Pointer(ringBuf)),

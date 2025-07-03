@@ -93,24 +93,13 @@ func TestDLQOss_BasicPushPop(t *testing.T) {
 //	dlq := newDLQOss(2)
 //	defer dlq.Close()
 //
-//	for i := 0; i < 2; i++ {
+//	for i := 0; i < 50; i++ {
 //		err := dlq.Push(context.Background(), &DLQEvent{OriginalEvent: mockEvent})
 //		assert.NoError(t, err)
 //	}
 //
 //	err := dlq.Push(context.Background(), &DLQEvent{OriginalEvent: mockEvent})
 //	assert.NoError(t, err)
-//
-//	events := make([]interface{}, 0, 3)
-//	for i := 0; i < 3; i++ {
-//		event, err := dlq.Pop(context.Background())
-//		assert.NoError(t, err)
-//		if event != nil {
-//			events = append(events, event.OriginalEvent)
-//		}
-//	}
-//
-//	assert.ElementsMatch(t, []interface{}{0, 1, "expansion"}, events)
 //}
 //
 //func TestDLQOss_Shrink(t *testing.T) {
